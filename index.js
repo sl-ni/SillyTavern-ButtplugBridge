@@ -24,6 +24,26 @@ let msgId = 1;
 let connected = false;
 let stopTimer = null;
 let pingInterval = null;
+let deviceVibrateIndices = [0]; // 該裝置有哪些震動馬達的 Index，預設只有一顆
+
+function extractVibrateIndices(device) {
+    try {
+        const scalarCmds = device?.DeviceMessages?.ScalarCmd;
+        if (Array.isArray(scalarCmds) && scalarCmds.length > 0) {
+            const indices = [];
+            scalarCmds.forEach((feature, idx) => {
+                // 沒標示 ActuatorType 或標示為 Vibrate 的都算震動馬達
+                if (!feature.ActuatorType || feature.ActuatorType === "Vibrate") {
+                    indices.push(idx);
+                }
+            });
+            if (indices.length > 0) return indices;
+        }
+    } catch (e) {
+        console.warn("[Buttplug Bridge] 無法解析裝置馬達數量，預設只用 Index 0：", e);
+    }
+    return [0];
+}
 
 function settings() {
     if (!extension_settings[MODULE_NAME]) {
@@ -128,6 +148,8 @@ function connect() {
                         s2.deviceIndex = devices[0].DeviceIndex;
                         saveSettingsDebounced();
                     }
+                    const activeDevice = devices.find(d => d.DeviceIndex === s2.deviceIndex) || devices[0];
+                    deviceVibrateIndices = extractVibrateIndices(activeDevice);
                     setStatus(`已連線：${devices[0].DeviceName}`);
                 } else {
                     setStatus("已連線，但沒有偵測到裝置");
@@ -138,6 +160,7 @@ function connect() {
                     s2.deviceIndex = msg.DeviceAdded.DeviceIndex;
                     saveSettingsDebounced();
                 }
+                deviceVibrateIndices = extractVibrateIndices(msg.DeviceAdded);
                 setStatus(`已連線：${msg.DeviceAdded.DeviceName}`);
             } else if (msg.Error) {
                 console.error("[Buttplug Bridge] 伺服器回報錯誤：", msg.Error.ErrorMessage);
@@ -186,12 +209,12 @@ function vibrate(level, durationSeconds) {
         return;
     }
 
-    console.log(`[Buttplug Bridge] 🔥 觸發震動 -> 強度：${level}，持續：${durationSeconds}秒`);
+    console.log(`[Buttplug Bridge] 🔥 觸發震動 -> 強度：${level}，持續：${durationSeconds}秒，馬達：${deviceVibrateIndices.join(",")}`);
     send([{
         ScalarCmd: {
             Id: nextId(),
             DeviceIndex: s.deviceIndex,
-            Scalars: [{ Index: 0, Scalar: level, ActuatorType: "Vibrate" }],
+            Scalars: deviceVibrateIndices.map(idx => ({ Index: idx, Scalar: level, ActuatorType: "Vibrate" })),
         },
     }]);
 
@@ -252,7 +275,7 @@ async function loadSettingsPanel() {
     $("#bpb_disconnect").on("click", () => disconnect());
     $("#bpb_test").on("click", () => {
         const first = s.rules[0];
-        if (first) vibrate(first.level, 1.0);
+        if (first) vibrate(first.level, 3.0);
     });
     $("#bpb_add_rule").on("click", () => {
         s.rules.push({ keywords: "", level: 0.5, duration: 3.0 });
