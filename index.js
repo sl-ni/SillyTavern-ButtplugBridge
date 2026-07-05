@@ -254,7 +254,7 @@ function renderRules() {
         const $row = $(`
             <div class="bpb_rule_row flex-container flexGap5" style="margin-bottom:6px; align-items:center;">
                 <input type="text" class="text_pole bpb_rule_keywords" placeholder="關鍵字，用逗號分隔，例如：震動,輕微震動" style="flex:2;" />
-                <input type="number" class="text_pole bpb_rule_level" placeholder="強度 0~1" min="0" max="1" step="0.05" style="flex:0 0 70px;" />
+                <input type="number" class="text_pole bpb_rule_level" placeholder="強度 0~100" min="0" max="100" step="5" style="flex:0 0 70px;" />
                 <input type="number" class="text_pole bpb_rule_duration" placeholder="秒數" min="0" step="0.5" style="flex:0 0 60px;" />
                 <div class="menu_button bpb_rule_up" title="提高優先度"><i class="fa-solid fa-arrow-up"></i></div>
                 <div class="menu_button bpb_rule_down" title="降低優先度"><i class="fa-solid fa-arrow-down"></i></div>
@@ -266,8 +266,9 @@ function renderRules() {
             rule.keywords = $(this).val();
             saveSettingsDebounced();
         });
-        $row.find(".bpb_rule_level").val(rule.level).on("change", function () {
-            rule.level = Math.max(0, Math.min(1, parseFloat($(this).val()) || 0));
+        $row.find(".bpb_rule_level").val(Math.round(rule.level * 100)).on("change", function () {
+            const pct = Math.max(0, Math.min(100, parseFloat($(this).val()) || 0));
+            rule.level = pct / 100;
             saveSettingsDebounced();
         });
         $row.find(".bpb_rule_duration").val(rule.duration).on("change", function () {
