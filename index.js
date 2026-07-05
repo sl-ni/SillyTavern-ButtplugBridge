@@ -23,6 +23,7 @@ let ws = null;
 let msgId = 1;
 let connected = false;
 let stopTimer = null;
+let pingInterval = null;
 
 function settings() {
     if (!extension_settings[MODULE_NAME]) {
@@ -109,6 +110,16 @@ function connect() {
                 connected = true;
                 setStatus("已連線，正在取得裝置列表...");
                 send([{ RequestDeviceList: { Id: nextId() } }]);
+
+                // Buttplug 協定要求客戶端定期送 Ping，否則伺服器會判定連線失效並主動斷開
+                const maxPingTime = msg.ServerInfo.MaxPingTime || 0;
+                if (pingInterval) clearInterval(pingInterval);
+                if (maxPingTime > 0) {
+                    const interval = Math.max(500, Math.floor(maxPingTime / 2));
+                    pingInterval = setInterval(() => {
+                        send([{ Ping: { Id: nextId() } }]);
+                    }, interval);
+                }
             } else if (msg.DeviceList) {
                 const devices = msg.DeviceList.Devices || [];
                 if (devices.length > 0) {
@@ -143,6 +154,10 @@ function connect() {
         connected = false;
         setStatus("未連線");
         ws = null;
+        if (pingInterval) {
+            clearInterval(pingInterval);
+            pingInterval = null;
+        }
     };
 }
 
@@ -153,6 +168,10 @@ function disconnect() {
     }
     connected = false;
     setStatus("未連線");
+    if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+    }
 }
 
 function send(messageArray) {

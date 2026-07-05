@@ -11,10 +11,7 @@
 ## 安裝方式
 
 1. 打開 SillyTavern → 左側選單 **Extensions（擴充套件）** → 上方 **Install Extension**
-2. 貼上這個 repo 的 GitHub 網址，例如：
-   ```
-   https://github.com/YOUR_GITHUB_USERNAME/SillyTavern-ButtplugBridge
-   ```
+2. 貼上這個GitHub 網址
 3. 選擇「安裝給所有使用者」或「只安裝給目前使用者」都可以
 4. 安裝完成後重新整理頁面，在 Extensions 面板裡應該會看到「Buttplug Bridge」的設定區塊
 
@@ -22,28 +19,17 @@
 
 1. 手機打開 **Intiface Central**，確認玩具已連接
 2. 進入 Intiface Central 的 **Settings → Server**，把 WebSocket Server 打開，並允許區域網路連線（不要只綁 localhost）
-3. 確認手機跟跑 SillyTavern 的裝置在**同一個 Wi-Fi 網段**
+3. 確認手機跟跑 SillyTavern 的裝置在**同一個 Wi-Fi**
 4. 在 SillyTavern 的 Buttplug Bridge 設定裡，填入手機的區網 IP，例如：
    ```
-   ws://192.168.0.141:12345
+   ws://1XX.XXX.XXX
    ```
 5. 按「連線」，狀態顯示已連線+裝置名稱後即完成
 6. 之後角色回覆內容只要包含「震動」「輕微震動」「觸發震動」會觸發弱震動；包含「劇烈震動」「強烈震動」會觸發強震動
 
 ## 自訂關鍵字/強度
 
-目前關鍵字與強度寫在 `index.js` 的 `defaultSettings` 裡：
 
-```js
-weakKeywords: ["觸發震動", "輕微震動", "震動"],
-weakLevel: 0.4,
-weakDuration: 3.0,
-strongKeywords: ["劇烈震動", "強烈震動"],
-strongLevel: 0.8,
-strongDuration: 4.0,
-```
-
-想改成別的字詞或強度，直接改這幾行後 commit 上 GitHub，SillyTavern 之後會依 `manifest.json` 裡的 `auto_update` 自動抓更新（或手動點 Extensions 面板的更新按鈕）。
 
 ## 注意事項 / 已知限制
 
