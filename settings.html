@@ -1,0 +1,44 @@
+<div class="buttplug-bridge-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Buttplug Bridge (震動控制)</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <label class="checkbox_label">
+                <input id="bpb_enabled" type="checkbox" />
+                <span>啟用</span>
+            </label>
+
+            <label for="bpb_url">Intiface Central WebSocket 位址：</label>
+            <input id="bpb_url" type="text" class="text_pole" placeholder="ws://127.0.0.1:12345" />
+
+            <div class="flex-container flexGap5" style="margin-top: 8px;">
+                <input id="bpb_connect" class="menu_button" type="button" value="連線" />
+                <input id="bpb_disconnect" class="menu_button" type="button" value="斷線" />
+                <input id="bpb_test" class="menu_button" type="button" value="測試震動" />
+            </div>
+
+            <div style="margin-top: 8px;">
+                狀態：<span id="bpb_status">未連線</span>
+            </div>
+
+            <hr>
+            <b>觸發規則</b>
+            <small style="display:block; margin-bottom:6px;">
+                清單越上面優先度越高，比對時由上往下找，命中第一條符合的規則就觸發震動，不會再往下比對。
+                同一格內想放多個關鍵字用逗號分隔。
+            </small>
+            <div id="bpb_rules"></div>
+            <div class="menu_button" id="bpb_add_rule" style="margin-top:4px; display:inline-block;">
+                <i class="fa-solid fa-plus"></i> 新增規則
+            </div>
+
+            <hr>
+            <small>
+                手機與跑 SillyTavern 的裝置需在同一個 Wi-Fi 網路下，並先在 Intiface Central 開啟
+                「Server」且允許區網連線，記得把手機的 IP 位址填入上面的網址欄。
+            </small>
+        </div>
+    </div>
+</div>
