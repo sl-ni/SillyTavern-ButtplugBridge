@@ -35,6 +35,26 @@
             </div>
 
             <hr>
+            <label class="checkbox_label">
+                <input id="bpb_dual_motor" type="checkbox" />
+                <span>幫第二顆馬達設定不同的關鍵字/強度</span>
+            </label>
+            <small style="display:block; margin-bottom:6px;">
+                沒有第二顆馬達，或想讓兩顆震動幅度一樣，不用勾選（預設兩顆馬達會同步用上面那組規則）。
+            </small>
+
+            <div id="bpb_rules2_wrapper">
+                <b>第二顆馬達規則</b>
+                <small style="display:block; margin-bottom:6px;">
+                    邏輯跟上面一樣，只套用在偵測到的第二顆(及之後)震動馬達。
+                </small>
+                <div id="bpb_rules2"></div>
+                <div class="menu_button" id="bpb_add_rule2" style="margin-top:4px; display:inline-block;">
+                    <i class="fa-solid fa-plus"></i> 新增規則
+                </div>
+            </div>
+
+            <hr>
             <small>
                 手機與跑 SillyTavern 的裝置需在同一個 Wi-Fi 網路下，並先在 Intiface Central 開啟
                 「Server」且允許區網連線，記得把手機的 IP 位址填入上面的網址欄。

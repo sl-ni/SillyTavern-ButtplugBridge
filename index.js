@@ -12,17 +12,19 @@ const defaultSettings = {
     enabled: true,
     intifaceUrl: "ws://127.0.0.1:12345",
     deviceIndex: null, // null = 自動選第一個裝置
+    dualMotorEnabled: false, // 是否幫第二顆馬達設定獨立規則；false = 兩顆馬達同步、共用同一組規則
     // 規則清單越上面優先度越高：比對時由上往下找，命中第一條符合的規則就觸發，不會再往下比對。
     rules: [
         { keywords: "劇烈震動,強烈震動", level: 0.8, duration: 4.0 },
         { keywords: "觸發震動,輕微震動,震動", level: 0.4, duration: 3.0 },
     ],
+    rules2: [], // 第二顆(及之後)馬達專用規則，只有 dualMotorEnabled 為 true 時才會用到
 };
 
 let ws = null;
 let msgId = 1;
 let connected = false;
-let stopTimer = null;
+let stopTimers = {}; // key: 馬達 Index 組合(用逗號join)，value: setTimeout 的 id
 let pingInterval = null;
 let deviceVibrateIndices = [0]; // 該裝置有哪些震動馬達的 Index，預設只有一顆
 
@@ -202,26 +204,46 @@ function send(messageArray) {
     ws.send(JSON.stringify(messageArray));
 }
 
-function vibrate(level, durationSeconds) {
+function vibrate(level, durationSeconds, indices) {
     const s = settings();
-    if (!connected || s.deviceIndex === null) {
-        console.warn("[Buttplug Bridge] 尚未連線或找不到裝置，無法震動");
+    indices = indices && indices.length > 0 ? indices : deviceVibrateIndices;
+    if (!connected || s.deviceIndex === null || !indices || indices.length === 0) {
+        console.warn("[Buttplug Bridge] 尚未連線、找不到裝置或無對應馬達，無法震動");
         return;
     }
 
-    console.log(`[Buttplug Bridge] 🔥 觸發震動 -> 強度：${level}，持續：${durationSeconds}秒，馬達：${deviceVibrateIndices.join(",")}`);
+    const key = indices.join(",");
+    console.log(`[Buttplug Bridge] 🔥 觸發震動 -> 強度：${level}，持續：${durationSeconds}秒，馬達 Index：${key}`);
     send([{
         ScalarCmd: {
             Id: nextId(),
             DeviceIndex: s.deviceIndex,
-            Scalars: deviceVibrateIndices.map(idx => ({ Index: idx, Scalar: level, ActuatorType: "Vibrate" })),
+            Scalars: indices.map(idx => ({ Index: idx, Scalar: level, ActuatorType: "Vibrate" })),
         },
     }]);
 
-    if (stopTimer) clearTimeout(stopTimer);
-    stopTimer = setTimeout(() => {
-        send([{ StopDeviceCmd: { Id: nextId(), DeviceIndex: s.deviceIndex } }]);
+    // 用 Scalar 0 只把「這幾顆」馬達停下來，不會用 StopDeviceCmd 影響到另一顆可能還在震動的馬達
+    if (stopTimers[key]) clearTimeout(stopTimers[key]);
+    stopTimers[key] = setTimeout(() => {
+        send([{
+            ScalarCmd: {
+                Id: nextId(),
+                DeviceIndex: s.deviceIndex,
+                Scalars: indices.map(idx => ({ Index: idx, Scalar: 0, ActuatorType: "Vibrate" })),
+            },
+        }]);
     }, durationSeconds * 1000);
+}
+
+function matchAndVibrate(text, rules, indices) {
+    if (!indices || indices.length === 0) return;
+    for (const rule of rules) {
+        const keywords = (rule.keywords || "").split(",").map(k => k.trim()).filter(Boolean);
+        if (keywords.some(k => text.includes(k))) {
+            vibrate(rule.level, rule.duration, indices);
+            break; // 命中第一條符合的規則就停止，不再往下比對
+        }
+    }
 }
 
 function handleCharacterMessage(messageIndex) {
@@ -241,12 +263,15 @@ function handleCharacterMessage(messageIndex) {
 
     const text = message.mes || "";
 
-    for (const rule of s.rules) {
-        const keywords = (rule.keywords || "").split(",").map(k => k.trim()).filter(Boolean);
-        if (keywords.some(k => text.includes(k))) {
-            vibrate(rule.level, rule.duration);
-            break; // 命中第一條符合的規則就停止，不再往下比對
-        }
+    if (!s.dualMotorEnabled || deviceVibrateIndices.length < 2) {
+        // 只偵測到一顆馬達，或使用者選擇不要分開設定：全部馬達共用同一組規則、同步觸發
+        matchAndVibrate(text, s.rules, deviceVibrateIndices);
+    } else {
+        // 分開設定：第一顆馬達用 s.rules，第二顆(及之後)馬達用 s.rules2
+        const motor1 = deviceVibrateIndices.slice(0, 1);
+        const motor2 = deviceVibrateIndices.slice(1);
+        matchAndVibrate(text, s.rules, motor1);
+        matchAndVibrate(text, s.rules2, motor2);
     }
 }
 
@@ -275,24 +300,35 @@ async function loadSettingsPanel() {
     $("#bpb_disconnect").on("click", () => disconnect());
     $("#bpb_test").on("click", () => {
         const first = s.rules[0];
-        if (first) vibrate(first.level, 3.0);
+        if (first) vibrate(first.level, 3.0, deviceVibrateIndices.slice(0, 1).length ? deviceVibrateIndices.slice(0, 1) : deviceVibrateIndices);
     });
     $("#bpb_add_rule").on("click", () => {
         s.rules.push({ keywords: "", level: 0.5, duration: 3.0 });
         saveSettingsDebounced();
-        renderRules();
+        renderRuleList(s.rules, "#bpb_rules");
     });
+    $("#bpb_add_rule2").on("click", () => {
+        s.rules2.push({ keywords: "", level: 0.5, duration: 3.0 });
+        saveSettingsDebounced();
+        renderRuleList(s.rules2, "#bpb_rules2");
+    });
+    $("#bpb_dual_motor").prop("checked", s.dualMotorEnabled).on("change", function () {
+        s.dualMotorEnabled = $(this).is(":checked");
+        saveSettingsDebounced();
+        $("#bpb_rules2_wrapper").toggle(s.dualMotorEnabled);
+    });
+    $("#bpb_rules2_wrapper").toggle(s.dualMotorEnabled);
 
-    renderRules();
+    renderRuleList(s.rules, "#bpb_rules");
+    renderRuleList(s.rules2, "#bpb_rules2");
 }
 
-function renderRules() {
-    const s = settings();
-    const $container = $("#bpb_rules");
+function renderRuleList(rules, containerSelector) {
+    const $container = $(containerSelector);
     if ($container.length === 0) return;
     $container.empty();
 
-    s.rules.forEach((rule, index) => {
+    rules.forEach((rule, index) => {
         const $row = $(`
             <div class="bpb_rule_row flex-container flexGap5" style="margin-bottom:6px; align-items:center;">
                 <input type="text" class="text_pole bpb_rule_keywords" placeholder="關鍵字，用逗號分隔，例如：震動,輕微震動" style="flex:2;" />
@@ -319,20 +355,20 @@ function renderRules() {
         });
         $row.find(".bpb_rule_up").on("click", () => {
             if (index === 0) return;
-            [s.rules[index - 1], s.rules[index]] = [s.rules[index], s.rules[index - 1]];
+            [rules[index - 1], rules[index]] = [rules[index], rules[index - 1]];
             saveSettingsDebounced();
-            renderRules();
+            renderRuleList(rules, containerSelector);
         });
         $row.find(".bpb_rule_down").on("click", () => {
-            if (index === s.rules.length - 1) return;
-            [s.rules[index + 1], s.rules[index]] = [s.rules[index], s.rules[index + 1]];
+            if (index === rules.length - 1) return;
+            [rules[index + 1], rules[index]] = [rules[index], rules[index + 1]];
             saveSettingsDebounced();
-            renderRules();
+            renderRuleList(rules, containerSelector);
         });
         $row.find(".bpb_rule_del").on("click", () => {
-            s.rules.splice(index, 1);
+            rules.splice(index, 1);
             saveSettingsDebounced();
-            renderRules();
+            renderRuleList(rules, containerSelector);
         });
 
         $container.append($row);
